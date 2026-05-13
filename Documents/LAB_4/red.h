@@ -5,7 +5,15 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <queue>
+#include <vector>
 // agregar librerias faltantes...
+
+struct inforuta
+{
+    int costo;
+    string camino;
+};
 
 
 // Clase para modelar la Red
@@ -15,7 +23,7 @@ private:
     // elegir contenedor adecuado para guardar los enrutadores de la red
     map<string, Enrutador> enrutadores;
     // elegir contenedor adecuado para guardar las tablas de enrutamiento de cada enrutador
-    map<string, map<string, int>> tablasEnrutamiento;
+    map<string, map<string, inforuta>> tablasEnrutamiento;
 
 public:
     // Constructores y destructor
@@ -32,8 +40,23 @@ public:
         }
     }
     // Remover un enrutador de la red
-    void removerEnrutador(const string &nombre){
-        enrutadores.erase(nombre);// posible error
+    void removerEnrutador(const string &nombre) {
+        auto it = enrutadores.find(nombre);
+
+        if (it != enrutadores.end()) { // Si el enrutador existe...
+
+            // 1. Limpiamos las referencias en los demás enrutadores
+            for (auto &par : enrutadores) {
+                par.second.eliminarEnlace(nombre);
+            }
+
+            // 2. Lo borramos del mapa principal (ahora sí, dentro del if)
+            enrutadores.erase(it);
+
+            cout << "El enrutador: " << nombre << " fue eliminado exitosamente." << endl;
+        } else {
+            cout << "Error: El enrutador " << nombre << " no existe en la red." << endl;
+        }
     }
 
     // Agregar un enlace entre dos enrutadores
@@ -51,7 +74,7 @@ public:
 
 
     // Eliminar un enlace entre dos enrutadores
-    void eliminarEnlace(const string &destino, string &origen){
+    void eliminarEnlace(const string &origen, string &destino){
         if (enrutadores.find(destino) != enrutadores.end()) {
             enrutadores[origen].eliminarEnlace(destino);
             enrutadores[destino].eliminarEnlace(origen);
@@ -99,30 +122,65 @@ public:
     }
 
     // Algoritmo de Dijkstra para calcular rutas y costos
-    void dijkstra(const string &origen);
+    void dijkstra(const string &origen){
+        map <string, int> distancias;
+        map < string, bool> visitados;
+        map <string , string > caminos;
+        priority_queue<pair<int, string>, vector<pair<int, string>>, greater<pair<int, string>>> cola;
+
+        for(auto const& [nombre, objeto] : enrutadores){
+            distancias[nombre] = 9999;
+            visitados[nombre] = false;
+        }
+        caminos[origen] = origen;
+        distancias[origen] = 0;
+        cola.push({0, origen});
+
+        while(!cola.empty()){
+            string u = cola.top().second;
+            cola.pop();
+
+            if(visitados[u]) continue;
+            visitados[u] = true;
+
+            auto vecinos = enrutadores[u].getEnlaces();
+
+            for(auto const& [v, costoEnlace] : vecinos){
+                if(!visitados[v] && distancias[u] + costoEnlace < distancias[v]){
+                    distancias[v] = distancias[u] + costoEnlace; // distancia[v] es el costo total
+
+                    caminos[v] = caminos[u] + "->" + v;
+
+                    actualizarTablas(origen, v, distancias[v], caminos[v]);
+                    cola.push({distancias[v], v});
+                }
+            }
+
+        }
+    }
 
     // Actualizar todas las tablas de enrutamiento
-    void actualizarTablas();
+    void actualizarTablas(string origen, string destino, int costotal, string rutatexto){
+        tablasEnrutamiento[origen][destino] = {costotal, rutatexto};
+    }
 
     // Obtener el costo entre dos enrutadores
     int obtenerCosto(const string &origen, const string &destino){
-        int suma;
+        int s = -1;
         auto enrutador1 = enrutadores.find(origen);
-        auto enrutador2 = enrutadores.find(destino);
 
         if(enrutador1 != enrutadores.end())
         {
-            enrutador1->second;
+            auto& enlace = enrutador1->second.getEnlaces();
+
+            auto enlacedestino = enlace.find(destino) ;
+            if(enlacedestino != enlace.end()){
+                s = enlacedestino->second;
+
+            }
         }
 
-        if(enrutador2 != enrutadores.end())
-        {
-            enrutador2->second;
-        }
-
-        suma = enrutador1 + enrutador2; // estoy travajando con punteros no se puede sumar asi
-
-        return suma;
+        return s;
     }
 
     // Obtener el camino eficiente entre dos enrutadores
@@ -130,7 +188,14 @@ public:
     //... obtenerCamino(const string &origen, const string &destino);
 
     // Mostrar la tabla de enrutamiento para un enrutador específico
-    void mostrarTablaEnrutamiento(const string &nombre);
+    void mostrarTablaEnrutamiento(const string &nombre){
+        for(auto const& [destino, info] : tablasEnrutamiento[nombre]){
+            cout << "Hacia: " << destino
+                 << " | Costo: " << info.costo
+                 << " | Ruta: " << info.camino << endl;
+        }
+    }
 };
+
 
 #endif // RED_H
